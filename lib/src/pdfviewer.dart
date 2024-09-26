@@ -4286,7 +4286,7 @@ class PdfViewerController extends ChangeNotifier with _ValueChangeNotifier {
   TextSearchOption? _textSearchOption;
 
   /// Sets the current page number.
-  set pageNumber(int num) {
+  set _pageNumber(int num) {
     _currentPageNumber = num;
     notifyListeners();
   }
