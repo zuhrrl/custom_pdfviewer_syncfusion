@@ -165,6 +165,7 @@ class SinglePageViewState extends State<SinglePageView> {
   @override
   void initState() {
     super.initState();
+    widget.pageController.jumpToPage(2);
   }
 
   @override
