@@ -207,6 +207,7 @@ class SfPdfViewer extends StatefulWidget {
     String src, {
     Key? key,
     Map<String, String>? headers,
+    this.initialPage,
     this.canShowScrollHead = true,
     this.pageSpacing = 4,
     this.controller,
@@ -976,6 +977,7 @@ class SfPdfViewer extends StatefulWidget {
   final bool canShowPageLoadingIndicator;
   String? documentOrientation;
   Size? documentSize;
+  int? initialPage;
 
   @override
   SfPdfViewerState createState() => SfPdfViewerState();
@@ -2696,7 +2698,9 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
                       }
                       if (widget.pageLayoutMode == PdfPageLayoutMode.single) {
                         _pageController = PageController(
-                            initialPage: _pdfViewerController.pageNumber - 1);
+                            initialPage: widget.initialPage != null
+                                ? widget.initialPage
+                                : _pdfViewerController.pageNumber - 1);
                         pdfContainer = MouseRegion(
                           cursor: _cursor,
                           onHover: (PointerHoverEvent details) {
