@@ -2697,10 +2697,12 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
                         });
                       }
                       if (widget.pageLayoutMode == PdfPageLayoutMode.single) {
+                        // _pageController = PageController(
+                        //     initialPage: widget.initialPage != null
+                        //         ? widget.initialPage!
+                        //         : _pdfViewerController.pageNumber - 1);
                         _pageController = PageController(
-                            initialPage: widget.initialPage != null
-                                ? widget.initialPage!
-                                : _pdfViewerController.pageNumber - 1);
+                            initialPage: _pdfViewerController.pageNumber - 1);
                         pdfContainer = MouseRegion(
                           cursor: _cursor,
                           onHover: (PointerHoverEvent details) {
@@ -2714,10 +2716,8 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
                             });
                           },
                           child: SinglePageView(
-                              widget.initialPage != null
-                                  ? widget.initialPage
-                                  : 0,
                               _singlePageViewKey,
+                              widget.initialPage ?? 0,
                               _pdfViewerController,
                               _pageController,
                               _handleSinglePageViewPageChanged,
