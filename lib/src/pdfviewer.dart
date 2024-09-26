@@ -2699,7 +2699,7 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
                       if (widget.pageLayoutMode == PdfPageLayoutMode.single) {
                         _pageController = PageController(
                             initialPage: widget.initialPage != null
-                                ? widget.initialPage
+                                ? widget.initialPage!
                                 : _pdfViewerController.pageNumber - 1);
                         pdfContainer = MouseRegion(
                           cursor: _cursor,
