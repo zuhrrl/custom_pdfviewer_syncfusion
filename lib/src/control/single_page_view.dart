@@ -604,16 +604,7 @@ class SinglePageViewState extends State<SinglePageView> {
                 _transformationController = TransformationController();
                 widget.onPageChanged(value);
               },
-              physics: (_canPanOnZoom ||
-                          _transformationController.value.getMaxScaleOnAxis() ==
-                              1) ||
-                      (kIsDesktop && !widget.isMobileWebView) ||
-                      (MediaQuery.of(context).orientation ==
-                              Orientation.landscape &&
-                          (!kIsDesktop ||
-                              (kIsDesktop && widget.isMobileWebView)))
-                  ? const BouncingScrollPhysics()
-                  : const NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               children: pages,
             ),
           );
