@@ -2714,7 +2714,9 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
                             });
                           },
                           child: SinglePageView(
-                              widget.initialPage ?? 0,
+                              widget.initialPage != null
+                                  ? widget.initialPage
+                                  : 0,
                               _singlePageViewKey,
                               _pdfViewerController,
                               _pageController,
