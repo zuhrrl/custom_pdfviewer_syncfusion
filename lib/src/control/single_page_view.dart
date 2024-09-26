@@ -25,6 +25,7 @@ class SinglePageView extends StatefulWidget {
   /// Constructor for PdfScrollable.
   const SinglePageView(
       Key key,
+      this.initialPage,
       this.pdfViewerController,
       this.pageController,
       this.onPageChanged,
@@ -47,6 +48,9 @@ class SinglePageView extends StatefulWidget {
       this.isTablet,
       this.children)
       : super(key: key);
+
+  /// Initial first page
+  final int initialPage;
 
   /// PdfViewer controller of PdfViewer.
   final PdfViewerController pdfViewerController;
@@ -166,7 +170,7 @@ class SinglePageViewState extends State<SinglePageView> {
   void initState() {
     super.initState();
     Future.delayed(Duration(seconds: 1), () {
-      widget.pageController.jumpToPage(2);
+      widget.pageController.jumpToPage(widget.initialPage);
     });
   }
 

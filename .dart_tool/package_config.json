@@ -71,7 +71,7 @@
       "name": "flutter",
       "rootUri": "file:///Users/wdt/dev/flutter/packages/flutter",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.3"
     },
     {
       "name": "flutter_web_plugins",
@@ -111,7 +111,7 @@
     },
     {
       "name": "meta",
-      "rootUri": "file:///Users/wdt/.pub-cache/hosted/pub.dev/meta-1.11.0",
+      "rootUri": "file:///Users/wdt/.pub-cache/hosted/pub.dev/meta-1.12.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -302,7 +302,10 @@
       "languageVersion": "2.17"
     }
   ],
-  "generated": "2024-05-19T08:00:11.007430Z",
+  "generated": "2024-09-26T08:37:45.321730Z",
   "generator": "pub",
-  "generatorVersion": "3.3.3"
+  "generatorVersion": "3.4.4",
+  "flutterRoot": "file:///Users/wdt/dev/flutter",
+  "flutterVersion": "3.22.3",
+  "pubCache": "file:///Users/wdt/.pub-cache"
 }
