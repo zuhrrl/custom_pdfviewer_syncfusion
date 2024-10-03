@@ -335,6 +335,7 @@ class SfPdfViewer extends StatefulWidget {
     File file, {
     Key? key,
     this.documentOrientation,
+    this.initialPage,
     this.documentSize,
     this.canShowScrollHead = true,
     this.pageSpacing = 4,
