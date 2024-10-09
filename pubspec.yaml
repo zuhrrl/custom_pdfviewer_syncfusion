@@ -52,6 +52,7 @@ dependencies:
   syncfusion_flutter_signaturepad: ^23.1.42     
 
   url_launcher: ^6.1.0
+  logger: ^2.4.0
 
 screenshots:
   - description: 'This screenshot shows the PdfViewer widget, which displays a PDF document.'

@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:logger/web.dart';
 import 'package:syncfusion_flutter_core/interactive_scroll_viewer_internal.dart';
 import 'package:syncfusion_flutter_core/localizations.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
@@ -165,13 +166,11 @@ class SinglePageViewState extends State<SinglePageView> {
 
   /// Current offset of single page view
   Offset currentOffset = Offset.zero;
+  bool isJumping = false;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(Duration(seconds: 1), () {
-      widget.pageController.jumpToPage(widget.initialPage);
-    });
   }
 
   @override

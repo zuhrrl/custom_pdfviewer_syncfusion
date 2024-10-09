@@ -146,6 +146,12 @@
       "languageVersion": "3.2"
     },
     {
+      "name": "logger",
+      "rootUri": "file:///Users/wdt/.pub-cache/hosted/pub.dev/logger-2.4.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
       "name": "matcher",
       "rootUri": "file:///Users/wdt/.pub-cache/hosted/pub.dev/matcher-0.12.16+1",
       "packageUri": "lib/",
@@ -380,7 +386,7 @@
       "languageVersion": "2.17"
     }
   ],
-  "generated": "2024-09-26T08:37:45.879241Z",
+  "generated": "2024-10-09T03:40:57.138705Z",
   "generator": "pub",
   "generatorVersion": "3.4.4",
   "flutterRoot": "file:///Users/wdt/dev/flutter",
