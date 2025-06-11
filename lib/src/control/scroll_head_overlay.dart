@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_core/interactive_scroll_viewer_internal.dart';
 import 'package:syncfusion_flutter_core/localizations.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
+
 import '../../pdfviewer.dart';
 import '../common/pdfviewer_helper.dart';
+import '../theme/theme.dart';
+import 'desktop_scrollbar.dart';
 import 'pdf_page_view.dart';
 import 'pdf_scrollable.dart';
 import 'scroll_head.dart';
@@ -25,35 +28,36 @@ const double _kPdfPaginationTextFieldWidth = 328.0;
 class ScrollHeadOverlay extends StatefulWidget {
   /// Constructor for ScrollHeadOverlay.
   const ScrollHeadOverlay(
-      this.canShowPaginationDialog,
-      this.canShowScrollStatus,
-      this.canShowScrollHead,
-      this.pdfViewerController,
-      this.isMobileWebView,
-      this.pdfDimension,
-      this.totalImageSize,
-      this.viewportDimension,
-      this.currentOffset,
-      this.maxScale,
-      this.minScale,
-      this.onDoubleTapZoomInvoked,
-      this.enableDoubleTapZooming,
-      this.interactionMode,
-      this.scaleEnabled,
-      this.maxPdfPageWidth,
-      this.pdfPages,
-      this.scrollDirection,
-      this.isBookmarkViewOpen,
-      this.textDirection,
-      this.child,
-      {Key? key,
-      this.transformationController,
-      this.onInteractionStart,
-      this.onInteractionUpdate,
-      this.onInteractionEnd,
-      this.onPdfOffsetChanged,
-      this.isPanEnabled = true})
-      : super(key: key);
+    this.canShowPaginationDialog,
+    this.canShowScrollStatus,
+    this.canShowScrollHead,
+    this.pdfViewerController,
+    this.isMobileWebView,
+    this.pdfDimension,
+    this.totalImageSize,
+    this.viewportDimension,
+    this.currentOffset,
+    this.maxScale,
+    this.minScale,
+    this.onDoubleTapZoomInvoked,
+    this.enableDoubleTapZooming,
+    this.interactionMode,
+    this.scaleEnabled,
+    this.maxPdfPageWidth,
+    this.pdfPages,
+    this.scrollDirection,
+    this.isBookmarkViewOpen,
+    this.textDirection,
+    this.child, {
+    Key? key,
+    this.transformationController,
+    this.onInteractionStart,
+    this.onInteractionUpdate,
+    this.onInteractionEnd,
+    this.onPdfOffsetChanged,
+    this.initiateTileRendering,
+    this.isPanEnabled = true,
+  }) : super(key: key);
 
   /// Indicates whether page navigation dialog must be shown or not.
   final bool canShowPaginationDialog;
@@ -138,6 +142,9 @@ class ScrollHeadOverlay extends StatefulWidget {
   /// Direction of text flow.
   final TextDirection textDirection;
 
+  /// Callback to initiate tile rendering.
+  final VoidCallback? initiateTileRendering;
+
   @override
   ScrollHeadOverlayState createState() => ScrollHeadOverlayState();
 }
@@ -147,10 +154,12 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
   final TextEditingController _textFieldController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   SfPdfViewerThemeData? _pdfViewerThemeData;
-  ThemeData? _themeData;
+  SfPdfViewerThemeData? _effectiveThemeData;
+  late ThemeData _themeData;
   SfLocalizations? _localizations;
   final GlobalKey _childKey = GlobalKey();
   Timer? _scrollTimer;
+  EdgeInsets _boundaryMargin = EdgeInsets.zero;
 
   /// Indicates whether the user interaction has ended.
   bool _isInteractionEnded = true;
@@ -180,6 +189,9 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
   @override
   void didChangeDependencies() {
     _pdfViewerThemeData = SfPdfViewerTheme.of(context);
+    _effectiveThemeData = Theme.of(context).useMaterial3
+        ? SfPdfViewerThemeDataM3(context)
+        : SfPdfViewerThemeDataM2(context);
     _themeData = Theme.of(context);
     _localizations = SfLocalizations.of(context);
     super.didChangeDependencies();
@@ -188,6 +200,7 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
   @override
   void dispose() {
     _pdfViewerThemeData = null;
+    _effectiveThemeData = null;
     _localizations = null;
     _focusNode.dispose();
     _scrollTimer?.cancel();
@@ -197,12 +210,14 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
 
   Offset _onDoubleTapZoomInvoked(Offset offset, Offset tapPosition) {
     widget.onDoubleTapZoomInvoked(widget.pdfViewerController.zoomLevel);
-    widget.pdfViewerController.zoomLevel =
-        widget.transformationController!.value.getMaxScaleOnAxis();
+    widget.pdfViewerController.zoomLevel = widget
+        .transformationController!
+        .value
+        .getMaxScaleOnAxis();
     final double pdfPageHeight =
         widget.pdfPages[widget.pdfViewerController.pageNumber]!.pageSize.height;
-    final double totalPageOffset = widget
-            .pdfPages[widget.pdfViewerController.pageCount]!.pageOffset +
+    final double totalPageOffset =
+        widget.pdfPages[widget.pdfViewerController.pageCount]!.pageOffset +
         widget.pdfPages[widget.pdfViewerController.pageNumber]!.pageSize.width;
     if (widget.pdfViewerController.zoomLevel <= 1) {
       //check if the total page offset less than viewport width in horizontal scroll direction
@@ -218,43 +233,47 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
             widget.maxPdfPageWidth * widget.pdfViewerController.zoomLevel) {
           final double clampedX = tapPosition.dx > widget.maxPdfPageWidth
               ? ((widget.maxPdfPageWidth * 2) -
-                      widget.viewportDimension.width) /
-                  2
+                        widget.viewportDimension.width) /
+                    2
               : 0;
           offset = Offset(
-              (widget.scrollDirection == PdfScrollDirection.vertical)
-                  ? clampedX
-                  : offset.dx,
-              offset.dy);
+            (widget.scrollDirection == PdfScrollDirection.vertical)
+                ? clampedX
+                : offset.dx,
+            offset.dy,
+          );
         }
       }
     }
-    final double widthFactor = (widget.pdfDimension.width) -
+    final double widthFactor =
+        (widget.pdfDimension.width) -
         (widget.viewportDimension.width / widget.pdfViewerController.zoomLevel);
     if (widget.viewportDimension.height > pdfPageHeight &&
         (widget.scrollDirection == PdfScrollDirection.horizontal ||
             (widget.pdfViewerController.pageCount == 1 &&
                 widget.scrollDirection == PdfScrollDirection.vertical))) {
       offset = Offset(
-          (widget.scrollDirection == PdfScrollDirection.vertical)
-              ? offset.dx.clamp(-widthFactor, widthFactor.abs())
-              : offset.dx,
-          ((tapPosition.dy > widget.viewportDimension.height / 2)
-                  ? offset.dy +
+        (widget.scrollDirection == PdfScrollDirection.vertical)
+            ? offset.dx.clamp(-widthFactor, widthFactor.abs())
+            : offset.dx,
+        ((tapPosition.dy > widget.viewportDimension.height / 2)
+                ? offset.dy +
                       (widget.viewportDimension.height -
                               widget
-                                  .pdfPages[
-                                      widget.pdfViewerController.pageNumber]!
+                                  .pdfPages[widget
+                                      .pdfViewerController
+                                      .pageNumber]!
                                   .pageSize
                                   .height) /
                           2
-                  : offset.dy / 2)
-              .clamp(
-                  0,
-                  ((widget.viewportDimension.height -
+                : offset.dy / 2)
+            .clamp(
+              0,
+              (((widget.viewportDimension.height -
                                   widget
                                       .pdfPages[widget
-                                          .pdfViewerController.pageNumber]!
+                                          .pdfViewerController
+                                          .pageNumber]!
                                       .pageSize
                                       .height) /
                               2 +
@@ -262,28 +281,35 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
                               .pdfPages[widget.pdfViewerController.pageNumber]!
                               .pageSize
                               .height) /
-                      2));
+                      2)
+                  .abs(),
+            ),
+      );
     } else {
       if ((widget.viewportDimension.width > totalPageOffset) &&
           (widget.pdfDimension.width >= widget.viewportDimension.width)) {
         offset = Offset(
-            (offset.dx - (widget.viewportDimension.width - totalPageOffset))
-                .clamp(
-                    0,
-                    (offset.dx -
-                            (widget.viewportDimension.width - totalPageOffset))
-                        .abs()),
-            offset.dy);
+          (offset.dx - (widget.viewportDimension.width - totalPageOffset))
+              .clamp(
+                0,
+                (offset.dx - (widget.viewportDimension.width - totalPageOffset))
+                    .abs(),
+              ),
+          offset.dy,
+        );
       }
       offset = Offset(
-          offset.dx,
-          offset.dy.clamp(
-              0,
-              (widget.pdfDimension.height -
-                      (widget.viewportDimension.height /
-                          widget.pdfViewerController.zoomLevel))
-                  .abs()));
+        offset.dx,
+        offset.dy.clamp(
+          0,
+          (widget.pdfDimension.height -
+                  (widget.viewportDimension.height /
+                      widget.pdfViewerController.zoomLevel))
+              .abs(),
+        ),
+      );
     }
+    widget.initiateTileRendering?.call();
     return offset;
   }
 
@@ -292,17 +318,12 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
     WidgetsBinding.instance.addPostFrameCallback((Duration timeStamp) {
       _updateScrollHeadPosition();
     });
-    // ignore: avoid_bool_literals_in_conditional_expressions
-    final bool enableDoubleTapZoom = ((!kIsDesktop &&
-                widget.enableDoubleTapZooming) ||
-            (kIsDesktop && widget.interactionMode == PdfInteractionMode.pan) ||
-            (kIsDesktop &&
-                widget.isMobileWebView &&
-                widget.enableDoubleTapZooming))
-        ? true
-        : false;
+    final bool enableDoubleTapZoom =
+        (!kIsDesktop && widget.enableDoubleTapZooming) ||
+        (kIsDesktop && widget.interactionMode == PdfInteractionMode.pan) ||
+        (kIsDesktop && widget.isMobileWebView && widget.enableDoubleTapZooming);
     final Widget scrollable = Directionality(
-      textDirection: TextDirection.ltr,
+      textDirection: widget.textDirection,
       child: InteractiveScrollViewer(
         widget.child,
         minScale: widget.minScale,
@@ -310,10 +331,9 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
         onDoubleTapZoomInvoked: _onDoubleTapZoomInvoked,
         transformationController: widget.transformationController,
         key: _childKey,
+        boundaryMargin: _boundaryMargin,
         enableDoubleTapZooming: enableDoubleTapZoom,
-        scaleEnabled:
-            // ignore: avoid_bool_literals_in_conditional_expressions
-            (!kIsDesktop || (kIsDesktop && widget.scaleEnabled)) ? true : false,
+        scaleEnabled: !kIsDesktop || (kIsDesktop && widget.scaleEnabled),
         panEnabled: widget.isPanEnabled,
         onInteractionStart: _handleInteractionStart,
         onInteractionUpdate: _handleInteractionChanged,
@@ -321,15 +341,18 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
         constrained: false,
       ),
     );
-    final Offset scrollHeadOffset =
-        Offset(_scrollHeadPositionX, _scrollHeadPositionY);
+    final Offset scrollHeadOffset = Offset(
+      _scrollHeadPositionX,
+      _scrollHeadPositionY,
+    );
     final bool hasBiggerWidth =
         widget.totalImageSize.width > widget.viewportDimension.width;
     final bool hasBiggerHeight =
         widget.totalImageSize.height > widget.viewportDimension.height;
     final bool enableScrollHead = hasBiggerWidth || hasBiggerHeight;
-    bool canShowScrollHead =
-        !enableScrollHead ? enableScrollHead : widget.canShowScrollHead;
+    bool canShowScrollHead = !enableScrollHead
+        ? enableScrollHead
+        : widget.canShowScrollHead;
     if (kIsDesktop && enableScrollHead) {
       canShowScrollHead = true;
     }
@@ -339,54 +362,124 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
     return Stack(
       children: <Widget>[
         scrollable,
-        GestureDetector(
-          onVerticalDragStart: (DragStartDetails details) {
-            _handleScrollHeadDragStart(details, true);
-          },
-          onVerticalDragUpdate: _handleVerticalScrollHeadDragUpdate,
-          onVerticalDragEnd: _handleScrollHeadDragEnd,
-          onHorizontalDragStart:
-              (widget.scrollDirection == PdfScrollDirection.horizontal)
-                  ? (DragStartDetails details) {
-                      _handleScrollHeadDragStart(details, false);
-                    }
-                  : null,
-          onHorizontalDragUpdate:
-              (widget.scrollDirection == PdfScrollDirection.horizontal)
-                  ? _handleScrollHeadDragUpdate
-                  : null,
-          onHorizontalDragEnd:
-              (widget.scrollDirection == PdfScrollDirection.horizontal)
-                  ? _handleScrollHeadDragEnd
-                  : null,
-          onTap: () {
-            if (!kIsDesktop || (kIsDesktop && widget.isMobileWebView)) {
-              _textFieldController.clear();
-              if (!FocusScope.of(context).hasPrimaryFocus) {
-                FocusScope.of(context).unfocus();
-              }
-              if (widget.canShowPaginationDialog) {
-                _clearSelection();
-                _showPaginationDialog();
-              }
-            }
-          },
-          child: Visibility(
-              visible: canShowScrollHead,
-              child: ScrollHead(
-                  hasBiggerWidth,
-                  hasBiggerHeight,
-                  scrollHeadOffset,
-                  widget.pdfViewerController,
-                  widget.isMobileWebView,
-                  widget.scrollDirection,
-                  widget.isBookmarkViewOpen,
-                  PdfPageLayoutMode.continuous)),
-        ),
+        if (kIsDesktop)
+          _buildDesktopScrollbar(context)
+        else
+          _buildScrollhead(
+            context,
+            canShowScrollHead,
+            hasBiggerWidth,
+            hasBiggerHeight,
+            scrollHeadOffset,
+          ),
         Visibility(
-            visible: isScrollHeadDragged && widget.canShowScrollStatus,
-            child: ScrollStatus(widget.pdfViewerController)),
+          visible: isScrollHeadDragged && widget.canShowScrollStatus,
+          child: ScrollStatus(widget.pdfViewerController),
+        ),
       ],
+    );
+  }
+
+  /// Builds the scrollhead for mobile platforms.
+  Widget _buildScrollhead(
+    BuildContext context,
+    bool canShowScrollHead,
+    bool hasBiggerWidth,
+    bool hasBiggerHeight,
+    Offset scrollHeadOffset,
+  ) {
+    return GestureDetector(
+      onVerticalDragStart: (DragStartDetails details) {
+        _handleScrollHeadDragStart(details, true);
+      },
+      onVerticalDragUpdate: _handleVerticalScrollHeadDragUpdate,
+      onVerticalDragEnd: _handleScrollHeadDragEnd,
+      onHorizontalDragStart:
+          (widget.scrollDirection == PdfScrollDirection.horizontal)
+          ? (DragStartDetails details) {
+              _handleScrollHeadDragStart(details, false);
+            }
+          : null,
+      onHorizontalDragUpdate:
+          (widget.scrollDirection == PdfScrollDirection.horizontal)
+          ? _handleScrollHeadDragUpdate
+          : null,
+      onHorizontalDragEnd:
+          (widget.scrollDirection == PdfScrollDirection.horizontal)
+          ? _handleScrollHeadDragEnd
+          : null,
+      onTap: () {
+        if (!kIsDesktop || (kIsDesktop && widget.isMobileWebView)) {
+          _textFieldController.clear();
+          if (!FocusScope.of(context).hasPrimaryFocus) {
+            FocusScope.of(context).unfocus();
+          }
+          if (widget.canShowPaginationDialog) {
+            _clearSelection();
+            _showPaginationDialog();
+          }
+        }
+      },
+      child: Visibility(
+        visible: canShowScrollHead,
+        child: ScrollHead(
+          hasBiggerWidth,
+          hasBiggerHeight,
+          scrollHeadOffset,
+          widget.pdfViewerController,
+          widget.isMobileWebView,
+          widget.scrollDirection,
+          widget.isBookmarkViewOpen,
+          PdfPageLayoutMode.continuous,
+        ),
+      ),
+    );
+  }
+
+  /// Builds the scrollbar for desktopa and mobile webview platforms.
+  Widget _buildDesktopScrollbar(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (!kIsDesktop || (kIsDesktop && widget.isMobileWebView)) {
+          _textFieldController.clear();
+          if (!FocusScope.of(context).hasPrimaryFocus) {
+            FocusScope.of(context).unfocus();
+          }
+          if (widget.canShowPaginationDialog) {
+            _clearSelection();
+            _showPaginationDialog();
+          }
+        }
+      },
+      child: DesktopScrollbar(
+        controller: widget.transformationController!,
+        viewportSize: widget.viewportDimension,
+        contentSize: widget.pdfDimension,
+        canFadeHorizontalScrollbar:
+            widget.scrollDirection == PdfScrollDirection.vertical,
+        canFadeVerticalScrollbar:
+            widget.scrollDirection == PdfScrollDirection.horizontal,
+        onVerticalDragStart: (DragStartDetails details) {
+          _handleScrollHeadDragStart(details, true);
+        },
+        onVerticalDragEnd: _handleScrollHeadDragEnd,
+        onVerticalDragUpdate: (_) {
+          final Offset currentOffset = widget.transformationController!.toScene(
+            Offset.zero,
+          );
+          widget.onPdfOffsetChanged!(currentOffset);
+        },
+        onHorizontalDragStart: (DragStartDetails details) {
+          _handleScrollHeadDragStart(details, false);
+        },
+        onHorizontalDragEnd: _handleScrollHeadDragEnd,
+        onHorizontalDragUpdate: (_) {
+          final Offset currentOffset = widget.transformationController!.toScene(
+            Offset.zero,
+          );
+          widget.onPdfOffsetChanged!(currentOffset);
+        },
+      ),
     );
   }
 
@@ -397,140 +490,262 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
 
   /// Show the pagination dialog box
   Future<void> _showPaginationDialog() async {
+    final bool isMaterial3 = Theme.of(context).useMaterial3;
     return showDialog<void>(
-        context: context,
-        builder: (BuildContext context) {
-          final Orientation orientation = MediaQuery.of(context).orientation;
-          return Directionality(
-            textDirection: widget.textDirection,
-            child: AlertDialog(
-              scrollable: true,
-              insetPadding: EdgeInsets.zero,
-              contentPadding: orientation == Orientation.portrait
-                  ? const EdgeInsets.all(24)
-                  : const EdgeInsets.only(right: 24, left: 24),
-              buttonPadding: orientation == Orientation.portrait
-                  ? const EdgeInsets.all(8)
-                  : const EdgeInsets.all(4),
-              backgroundColor: _pdfViewerThemeData!
-                      .paginationDialogStyle?.backgroundColor ??
-                  (Theme.of(context).colorScheme.brightness == Brightness.light
-                      ? Colors.white
-                      : const Color(0xFF424242)),
-              title: Text(_localizations!.pdfGoToPageLabel,
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineMedium!
+      context: context,
+      builder: (BuildContext context) {
+        final Orientation orientation = MediaQuery.of(context).orientation;
+        return Directionality(
+          textDirection: widget.textDirection,
+          child: AlertDialog(
+            scrollable: true,
+            insetPadding: EdgeInsets.zero,
+            contentPadding: isMaterial3
+                ? const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 24.0)
+                : orientation == Orientation.portrait
+                ? const EdgeInsets.all(24)
+                : const EdgeInsets.only(right: 24, left: 24),
+            buttonPadding: orientation == Orientation.portrait
+                ? const EdgeInsets.all(8)
+                : const EdgeInsets.all(4),
+            backgroundColor:
+                _pdfViewerThemeData!.paginationDialogStyle?.backgroundColor ??
+                _effectiveThemeData!.paginationDialogStyle?.backgroundColor ??
+                (Theme.of(context).colorScheme.brightness == Brightness.light
+                    ? Colors.white
+                    : const Color(0xFF424242)),
+            shape: isMaterial3
+                ? null
+                : const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(4.0)),
+                  ),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _localizations!.pdfGoToPageLabel,
+                  style: Theme.of(context).textTheme.headlineMedium!
                       .copyWith(
-                        fontSize: 20,
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? Colors.black.withOpacity(0.87)
-                            : Colors.white.withOpacity(0.87),
+                        fontSize: isMaterial3 ? 24 : 20,
+                        color: isMaterial3
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Theme.of(context).brightness == Brightness.light
+                            ? Colors.black.withValues(alpha: 0.87)
+                            : Colors.white.withValues(alpha: 0.87),
                       )
-                      .merge(_pdfViewerThemeData!
-                          .paginationDialogStyle?.headerTextStyle)),
-              shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(4.0))),
-              content:
-                  SingleChildScrollView(child: _paginationTextField(context)),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () {
-                    _textFieldController.clear();
-                    Navigator.of(context).pop();
-                  },
-                  child: Text(
-                    _localizations!.pdfPaginationDialogCancelLabel,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium!
-                        .copyWith(
-                          fontSize: 14,
-                          color: _themeData!.colorScheme.primary,
-                        )
-                        .merge(_pdfViewerThemeData!
-                            .paginationDialogStyle?.cancelTextStyle),
-                  ),
+                      .merge(
+                        _pdfViewerThemeData!
+                            .paginationDialogStyle
+                            ?.headerTextStyle,
+                      ),
                 ),
-                TextButton(
-                  onPressed: () {
-                    _handlePageNumberValidation();
-                  },
-                  child: Text(
-                    _localizations!.pdfPaginationDialogOkLabel,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium!
-                        .copyWith(
-                          fontSize: 14,
-                          color: _themeData!.colorScheme.primary,
-                        )
-                        .merge(_pdfViewerThemeData!
-                            .paginationDialogStyle?.okTextStyle),
+                if (isMaterial3)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    iconSize: 24,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    onPressed: () {
+                      _textFieldController.clear();
+                      Navigator.of(context).pop();
+                    },
                   ),
-                )
               ],
             ),
-          );
-        });
+            content: SingleChildScrollView(
+              child: Column(
+                children: <Widget>[
+                  if (isMaterial3)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '1 - ${widget.pdfViewerController.pageCount}',
+                          style: Theme.of(context).textTheme.bodyLarge!
+                              .copyWith(
+                                fontSize: 14,
+                                fontWeight: isMaterial3
+                                    ? FontWeight.w400
+                                    : null,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                        ),
+                      ),
+                    ),
+                  _paginationTextField(context),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () {
+                  _textFieldController.clear();
+                  Navigator.of(context).pop();
+                },
+                style: isMaterial3
+                    ? TextButton.styleFrom(
+                        fixedSize: const Size(double.infinity, 40),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 20,
+                        ),
+                      )
+                    : null,
+                child: Text(
+                  _localizations!.pdfPaginationDialogCancelLabel,
+                  style: Theme.of(context).textTheme.bodyMedium!
+                      .copyWith(
+                        fontSize: 14,
+                        fontWeight: isMaterial3 ? FontWeight.w500 : null,
+                        color: _themeData.colorScheme.primary,
+                      )
+                      .merge(
+                        _pdfViewerThemeData!
+                            .paginationDialogStyle
+                            ?.cancelTextStyle,
+                      ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  _handlePageNumberValidation();
+                },
+                style: isMaterial3
+                    ? TextButton.styleFrom(
+                        fixedSize: const Size(double.infinity, 40),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 20,
+                        ),
+                      )
+                    : null,
+                child: Text(
+                  _localizations!.pdfPaginationDialogOkLabel,
+                  style: Theme.of(context).textTheme.bodyMedium!
+                      .copyWith(
+                        fontSize: 14,
+                        fontWeight: isMaterial3 ? FontWeight.w500 : null,
+                        color: _themeData.colorScheme.primary,
+                      )
+                      .merge(
+                        _pdfViewerThemeData!.paginationDialogStyle?.okTextStyle,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   /// A material design Text field for pagination dialog box.
   Widget _paginationTextField(BuildContext context) {
+    final bool isMaterial3 = Theme.of(context).useMaterial3;
     return Form(
       key: _formKey,
       child: SizedBox(
-        width: _kPdfPaginationTextFieldWidth,
+        width: isMaterial3 ? 312.0 : _kPdfPaginationTextFieldWidth,
         child: TextFormField(
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium!
+          style: Theme.of(context).textTheme.titleMedium!
               .copyWith(
                 fontSize: 16,
                 color: Theme.of(context).brightness == Brightness.light
-                    ? Colors.black.withOpacity(0.87)
-                    : Colors.white.withOpacity(0.87),
+                    ? Colors.black.withValues(alpha: 0.87)
+                    : Colors.white.withValues(alpha: 0.87),
               )
-              .merge(_pdfViewerThemeData!
-                  .paginationDialogStyle?.inputFieldTextStyle),
+              .merge(
+                _pdfViewerThemeData!.paginationDialogStyle?.inputFieldTextStyle,
+              ),
           focusNode: _focusNode,
           decoration: InputDecoration(
             isDense: true,
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: _themeData!.colorScheme.primary),
-            ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 6),
+            border: isMaterial3
+                ? OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color:
+                          _pdfViewerThemeData!
+                              .passwordDialogStyle
+                              ?.inputFieldBorderColor ??
+                          _effectiveThemeData!
+                              .passwordDialogStyle
+                              ?.inputFieldBorderColor ??
+                          _themeData.colorScheme.primary,
+                    ),
+                  )
+                : null,
+            errorBorder: isMaterial3
+                ? OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(3.5),
+                    borderSide: BorderSide(
+                      color:
+                          _pdfViewerThemeData!
+                              .passwordDialogStyle
+                              ?.errorBorderColor ??
+                          _effectiveThemeData!
+                              .passwordDialogStyle
+                              ?.errorBorderColor ??
+                          _themeData.colorScheme.error,
+                    ),
+                  )
+                : null,
+            focusedBorder: isMaterial3
+                ? OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color:
+                          _pdfViewerThemeData!
+                              .passwordDialogStyle
+                              ?.inputFieldBorderColor ??
+                          _effectiveThemeData!
+                              .passwordDialogStyle
+                              ?.inputFieldBorderColor ??
+                          _themeData.colorScheme.primary,
+                      width: 2,
+                    ),
+                  )
+                : UnderlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _themeData.colorScheme.primary,
+                    ),
+                  ),
+            contentPadding: isMaterial3
+                ? const EdgeInsets.all(16)
+                : const EdgeInsets.symmetric(vertical: 6),
             hintText: _localizations!.pdfEnterPageNumberLabel,
-            hintStyle: Theme.of(context)
-                .textTheme
-                .titleMedium!
+            hintStyle: Theme.of(context).textTheme.titleMedium!
                 .copyWith(
                   fontSize: 16,
                   color: Theme.of(context).brightness == Brightness.light
-                      ? Colors.black.withOpacity(0.6)
-                      : Colors.white.withOpacity(0.6),
+                      ? Colors.black.withValues(alpha: 0.6)
+                      : Colors.white.withValues(alpha: 0.6),
                 )
                 .merge(
-                    _pdfViewerThemeData!.paginationDialogStyle?.hintTextStyle),
-            counterText:
-                '${widget.pdfViewerController.pageNumber}/${widget.pdfViewerController.pageCount}',
-            counterStyle: Theme.of(context)
-                .textTheme
-                .bodySmall!
+                  _pdfViewerThemeData!.paginationDialogStyle?.hintTextStyle,
+                ),
+            counterText: isMaterial3
+                ? null
+                : '${widget.pdfViewerController.pageNumber}/${widget.pdfViewerController.pageCount}',
+            counterStyle: Theme.of(context).textTheme.bodySmall!
                 .copyWith(
                   fontSize: 12,
                   color: Theme.of(context).brightness == Brightness.light
-                      ? Colors.black.withOpacity(0.6)
-                      : Colors.white.withOpacity(0.6),
+                      ? Colors.black.withValues(alpha: 0.6)
+                      : Colors.white.withValues(alpha: 0.6),
                 )
-                .merge(_pdfViewerThemeData!
-                    .paginationDialogStyle?.pageInfoTextStyle),
-            errorStyle: Theme.of(context)
-                .textTheme
-                .bodySmall!
-                .copyWith(fontSize: 12, color: _themeData!.colorScheme.error)
-                .merge(_pdfViewerThemeData!
-                    .paginationDialogStyle?.validationTextStyle),
+                .merge(
+                  _pdfViewerThemeData!.paginationDialogStyle?.pageInfoTextStyle,
+                ),
+            errorStyle: Theme.of(context).textTheme.bodySmall!
+                .copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: _themeData.colorScheme.error,
+                )
+                .merge(
+                  _pdfViewerThemeData!
+                      .paginationDialogStyle
+                      ?.validationTextStyle,
+                ),
           ),
           keyboardType: TextInputType.number,
           enableInteractiveSelection: false,
@@ -573,13 +788,17 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
 
   /// updates UI when scroll head drag is started.
   void _handleScrollHeadDragStart(
-      DragStartDetails details, bool isVerticalDrag) {
+    DragStartDetails details,
+    bool isVerticalDrag,
+  ) {
     _isInteractionEnded = false;
-    if (widget.scrollDirection == PdfScrollDirection.horizontal &&
-        isVerticalDrag) {
-      isScrollHeadDragged = false;
+    if (widget.pdfViewerController.pageCount > 1) {
+      isScrollHeadDragged =
+          widget.scrollDirection == PdfScrollDirection.horizontal
+          ? !isVerticalDrag
+          : isVerticalDrag;
     } else {
-      isScrollHeadDragged = true;
+      isScrollHeadDragged = false;
     }
   }
 
@@ -588,23 +807,30 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
     _isInteractionEnded = false;
     if (!widget.viewportDimension.isEmpty) {
       final double dragOffset = details.delta.dx + _scrollHeadPositionX;
-      final double scrollHeadPosition = widget.viewportDimension.width -
+      final double scrollHeadPosition =
+          widget.viewportDimension.width -
           (kIsDesktop ? _kPdfScrollBarHeight : _kPdfScrollHeadHeight);
       if (dragOffset < scrollHeadPosition && dragOffset >= 0) {
-        widget.onPdfOffsetChanged!(Offset(
+        widget.onPdfOffsetChanged!(
+          Offset(
             (widget.pdfDimension.width -
                     (widget.viewportDimension.width / _scale)) *
                 (dragOffset / scrollHeadPosition),
-            widget.currentOffset.dy));
+            widget.currentOffset.dy,
+          ),
+        );
         _scrollHeadPositionX = dragOffset;
       } else {
         if (dragOffset < 0) {
           widget.onPdfOffsetChanged!(Offset(0, widget.currentOffset.dy));
         } else {
-          widget.onPdfOffsetChanged!(Offset(
+          widget.onPdfOffsetChanged!(
+            Offset(
               widget.pdfDimension.width -
                   (widget.viewportDimension.width / _scale),
-              widget.currentOffset.dy));
+              widget.currentOffset.dy,
+            ),
+          );
         }
       }
     }
@@ -614,23 +840,30 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
   void _handleVerticalScrollHeadDragUpdate(DragUpdateDetails details) {
     if (!widget.viewportDimension.isEmpty) {
       final double dragOffset = details.delta.dy + _scrollHeadPositionY;
-      final double scrollHeadPosition = widget.viewportDimension.height -
+      final double scrollHeadPosition =
+          widget.viewportDimension.height -
           (kIsDesktop ? _kPdfScrollBarHeight : _kPdfScrollHeadHeight);
       if (dragOffset < scrollHeadPosition && dragOffset >= 0) {
-        widget.onPdfOffsetChanged!(Offset(
+        widget.onPdfOffsetChanged!(
+          Offset(
             widget.currentOffset.dx,
             (widget.pdfDimension.height -
                     (widget.viewportDimension.height / _scale)) *
-                (dragOffset / scrollHeadPosition)));
+                (dragOffset / scrollHeadPosition),
+          ),
+        );
         _scrollHeadPositionY = dragOffset;
       } else {
         if (dragOffset < 0) {
           widget.onPdfOffsetChanged!(Offset(widget.currentOffset.dx, 0));
         } else {
-          widget.onPdfOffsetChanged!(Offset(
+          widget.onPdfOffsetChanged!(
+            Offset(
               widget.currentOffset.dx,
               widget.pdfDimension.height -
-                  (widget.viewportDimension.height / _scale)));
+                  (widget.viewportDimension.height / _scale),
+            ),
+          );
         }
       }
     }
@@ -640,6 +873,7 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
   void _handleScrollHeadDragEnd(DragEndDetails details) {
     _isInteractionEnded = true;
     isScrollHeadDragged = false;
+    widget.initiateTileRendering?.call();
   }
 
   /// handles interaction start.
@@ -653,6 +887,24 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
     if (details.scale != 1) {
       _isInteractionEnded = false;
     }
+    if (details.scale < 1 && widget.pdfViewerController.zoomLevel > 1) {
+      final double verticalMargin =
+          widget.totalImageSize.height < widget.viewportDimension.height
+          ? (widget.viewportDimension.height - widget.totalImageSize.height) / 2
+          : 0;
+      final double horizontalMargin =
+          widget.totalImageSize.width < widget.viewportDimension.width
+          ? (widget.viewportDimension.width - widget.totalImageSize.width) / 2
+          : 0;
+      _boundaryMargin = EdgeInsets.only(
+        top: verticalMargin,
+        bottom: verticalMargin,
+        left: horizontalMargin,
+        right: horizontalMargin,
+      );
+    } else {
+      _boundaryMargin = EdgeInsets.zero;
+    }
     widget.onInteractionUpdate?.call(details);
   }
 
@@ -661,47 +913,59 @@ class ScrollHeadOverlayState extends State<ScrollHeadOverlay> {
     _isInteractionEnded = true;
     widget.onInteractionEnd?.call(details);
     _scrollTimer?.cancel();
-    _scrollTimer = Timer(
-      const Duration(milliseconds: 100),
-      () {
-        isScrolled = false;
-      },
-    );
+    _scrollTimer = Timer(const Duration(milliseconds: 100), () {
+      isScrolled = false;
+    });
   }
 
   /// updates the scroll head position based on the interaction results.
   void _updateScrollHeadPosition() {
-    if (widget.pdfDimension.height > 0 && widget.viewportDimension.height > 0) {
+    if (widget.pdfDimension.height > 0 &&
+        widget.pdfDimension.width > 0 &&
+        widget.viewportDimension.height > 0 &&
+        widget.viewportDimension.width > 0) {
       _scale = widget.transformationController!.value.getMaxScaleOnAxis();
-      final double currentOffsetX =
-          widget.transformationController!.toScene(Offset.zero).dx;
-      final double currentOffsetY =
-          widget.transformationController!.toScene(Offset.zero).dy;
-      final double scrollPercentX = currentOffsetX.abs() /
+      final double currentOffsetX = widget.transformationController!
+          .toScene(Offset.zero)
+          .dx;
+      final double currentOffsetY = widget.transformationController!
+          .toScene(Offset.zero)
+          .dy;
+      final double scrollPercentX =
+          currentOffsetX.abs() /
           (widget.pdfDimension.width -
               (widget.viewportDimension.width / _scale));
-      final double scrollPercentY = currentOffsetY.abs() /
+      final double scrollPercentY =
+          currentOffsetY.abs() /
           (widget.pdfDimension.height -
               (widget.viewportDimension.height / _scale));
-      final double scrollHeadMaxExtentX = widget.viewportDimension.width -
+      final double scrollHeadMaxExtentX =
+          widget.viewportDimension.width -
           (kIsDesktop ? _kPdfScrollBarHeight : _kPdfScrollHeadHeight);
-      final double scrollHeadMaxExtentY = widget.viewportDimension.height -
+      final double scrollHeadMaxExtentY =
+          widget.viewportDimension.height -
           (kIsDesktop ? _kPdfScrollBarHeight : _kPdfScrollHeadHeight);
-      final double newPositionX = (scrollPercentX * scrollHeadMaxExtentX)
-          .clamp(1, scrollHeadMaxExtentX);
-      final double newPositionY = (scrollPercentY * scrollHeadMaxExtentY)
-          .clamp(1, scrollHeadMaxExtentY);
+      final double newPositionX = (scrollPercentX * scrollHeadMaxExtentX).clamp(
+        1,
+        scrollHeadMaxExtentX,
+      );
+      final double newPositionY = (scrollPercentY * scrollHeadMaxExtentY).clamp(
+        1,
+        scrollHeadMaxExtentY,
+      );
       if (newPositionX.round() != _scrollHeadPositionX.round() &&
           _isInteractionEnded) {
         _scrollHeadPositionX = newPositionX;
         widget.onPdfOffsetChanged!(
-            widget.transformationController!.toScene(Offset.zero));
+          widget.transformationController!.toScene(Offset.zero),
+        );
       }
       if (newPositionY.round() != _scrollHeadPositionY.round() &&
           _isInteractionEnded) {
         _scrollHeadPositionY = newPositionY;
         widget.onPdfOffsetChanged!(
-            widget.transformationController!.toScene(Offset.zero));
+          widget.transformationController!.toScene(Offset.zero),
+        );
       }
     }
   }

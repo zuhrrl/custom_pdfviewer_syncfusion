@@ -29,9 +29,11 @@ class PdfRadioFormField extends PdfFormField {
 /// Helper class for [PdfRadioFormField].
 class PdfRadioFormFieldHelper extends PdfFormFieldHelper {
   /// Initializes a new instance of the [PdfRadioFormFieldHelper] class.
-  PdfRadioFormFieldHelper(this.pdfRadioField, int pageIndex,
-      {this.onValueChanged})
-      : super(pdfRadioField, pageIndex) {
+  PdfRadioFormFieldHelper(
+    this.pdfRadioField,
+    int pageIndex, {
+    this.onValueChanged,
+  }) : super(pdfRadioField, pageIndex) {
     bounds = pdfRadioField.bounds;
   }
 
@@ -44,6 +46,9 @@ class PdfRadioFormFieldHelper extends PdfFormFieldHelper {
   /// The radio button form field object.
   late PdfRadioFormField radioFormField;
 
+  /// Flag to determine whether the form field can be reset to null value.
+  late final bool canReset;
+
   /// Creates the radio button form field object.
   PdfRadioFormField getFormField() {
     final List<String> items = <String>[];
@@ -53,7 +58,7 @@ class PdfRadioFormFieldHelper extends PdfFormFieldHelper {
     final String selectedValue = pdfRadioField.selectedIndex != -1
         ? items[pdfRadioField.selectedIndex]
         : '';
-
+    canReset = selectedValue == '';
     radioFormField = PdfRadioFormField._()
       .._items = items
       .._selectedItem = selectedValue;
@@ -67,13 +72,17 @@ class PdfRadioFormFieldHelper extends PdfFormFieldHelper {
     if (radioFormField._selectedItem != newValue) {
       if (!radioFormField.items.contains(newValue)) {
         throw ArgumentError.value(
-            newValue, 'selectedItem', 'The value is not in the list of items.');
+          newValue,
+          'selectedItem',
+          'The value is not in the list of items.',
+        );
       }
       final String oldValue = radioFormField._selectedItem;
       setRadioButtonValue(newValue);
       if (onValueChanged != null) {
-        onValueChanged!(PdfFormFieldValueChangedDetails(
-            radioFormField, oldValue, newValue));
+        onValueChanged!(
+          PdfFormFieldValueChangedDetails(radioFormField, oldValue, newValue),
+        );
       }
       rebuild();
     }
@@ -86,15 +95,15 @@ class PdfRadioFormFieldHelper extends PdfFormFieldHelper {
   }
 
   /// Builds the radio button form field.
-  List<Widget> build(BuildContext context, double heightPercentage,
-      {required Function(Offset) onTap}) {
+  List<Widget> build(BuildContext context, double heightPercentage) {
     final List<Widget> widgets = <Widget>[];
     final PdfRadioButtonItemCollection item = pdfRadioField.items;
 
     for (int j = 0; j < item.count; j++) {
       final Rect bounds = item[j].bounds;
-      final double selectionPadding =
-          kIsDesktop ? 0 : kFormFieldSelectionPadding;
+      final double selectionPadding = kIsDesktop
+          ? 0
+          : kFormFieldSelectionPadding;
       final Rect adjustedBounds = bounds.inflate(selectionPadding);
 
       widgets.add(
@@ -103,23 +112,31 @@ class PdfRadioFormFieldHelper extends PdfFormFieldHelper {
           top: adjustedBounds.top / heightPercentage,
           width: adjustedBounds.width / heightPercentage,
           height: adjustedBounds.height / heightPercentage,
-          child: Listener(
-            onPointerUp: (PointerUpEvent event) {
-              onTap(event.localPosition.translate(
-                  adjustedBounds.left / heightPercentage,
-                  adjustedBounds.top / heightPercentage));
-            },
-            child: PdfRadioButton(
-              groupValue: radioFormField._selectedItem,
-              value: item[j].value,
-              readOnly: radioFormField.readOnly,
-              onChanged: invokeValueChanged,
-              heightPercentage: heightPercentage,
-              selectionPadding: selectionPadding,
-              fillColor: const Color.fromARGB(
-                  255, 221, 228, 255), // Custom color for the unchecked fill
-              size: bounds.height / heightPercentage,
-            ),
+          child: PdfRadioButton(
+            groupValue: radioFormField._selectedItem,
+            value: item[j].value,
+            readOnly: radioFormField.readOnly,
+            onChanged: invokeValueChanged,
+            heightPercentage: heightPercentage,
+            selectionPadding: selectionPadding,
+            fillColor: pdfRadioField.items[j].backColor.isEmpty
+                ? const Color.fromARGB(255, 221, 228, 255)
+                : Color.fromRGBO(
+                    pdfRadioField.items[j].backColor.r,
+                    pdfRadioField.items[j].backColor.g,
+                    pdfRadioField.items[j].backColor.b,
+                    1,
+                  ),
+            borderColor: pdfRadioField.items[j].borderColor.isEmpty
+                ? Colors.transparent
+                : Color.fromRGBO(
+                    pdfRadioField.items[j].borderColor.r,
+                    pdfRadioField.items[j].borderColor.g,
+                    pdfRadioField.items[j].borderColor.b,
+                    1,
+                  ),
+            borderWidth: pdfRadioField.items[j].borderWidth / heightPercentage,
+            size: bounds.height / heightPercentage,
           ),
         ),
       );
@@ -132,17 +149,19 @@ class PdfRadioFormFieldHelper extends PdfFormFieldHelper {
 /// Customized radio button
 class PdfRadioButton extends StatefulWidget {
   /// Constructor for PdfRadioButton
-  const PdfRadioButton(
-      {Key? key,
-      required this.value,
-      required this.groupValue,
-      this.readOnly = false,
-      required this.onChanged,
-      required this.heightPercentage,
-      required this.selectionPadding,
-      this.fillColor,
-      this.size = 24.0})
-      : super(key: key);
+  const PdfRadioButton({
+    Key? key,
+    required this.value,
+    required this.groupValue,
+    this.readOnly = false,
+    required this.onChanged,
+    required this.heightPercentage,
+    required this.selectionPadding,
+    required this.fillColor,
+    required this.borderColor,
+    required this.borderWidth,
+    this.size = 24.0,
+  }) : super(key: key);
 
   /// Height percentage
   final double heightPercentage;
@@ -160,13 +179,19 @@ class PdfRadioButton extends StatefulWidget {
   final ValueChanged<String> onChanged;
 
   /// Radio button fill color
-  final Color? fillColor;
+  final Color fillColor;
 
   /// Radio button size
   final double size;
 
   /// Radio button padding
   final double selectionPadding;
+
+  /// Radio button border color
+  final Color borderColor;
+
+  /// Radio button border width
+  final double borderWidth;
 
   @override
   _PdfRadioButtonState createState() => _PdfRadioButtonState();
@@ -188,21 +213,22 @@ class _PdfRadioButtonState extends State<PdfRadioButton> {
         widget.onChanged(widget.value);
       },
       child: Padding(
-        padding:
-            EdgeInsets.all(widget.selectionPadding / widget.heightPercentage),
+        padding: EdgeInsets.all(
+          widget.selectionPadding / widget.heightPercentage,
+        ),
         child: Container(
           width: widget.size,
           height: widget.size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: widget.fillColor ?? Colors.transparent,
+            color: widget.fillColor,
+            border: Border.all(
+              color: widget.borderColor,
+              width: widget.borderWidth,
+            ),
           ),
           child: widget.groupValue == widget.value
-              ? Icon(
-                  Icons.circle,
-                  size: widget.size / 2.0,
-                  color: Colors.black,
-                )
+              ? Icon(Icons.circle, size: widget.size / 2.0, color: Colors.black)
               : Container(),
         ),
       ),

@@ -1,7 +1,7 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
 export "FLUTTER_ROOT=/Users/wdt/dev/flutter"
-export "FLUTTER_APPLICATION_PATH=/Users/wdt/Documents/zul/syncfusion_flutter_pdfviewer-23.1.42/example"
+export "FLUTTER_APPLICATION_PATH=/Users/wdt/Documents/zul/custom_pdfviewer_syncfusion/example"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
 export "FLUTTER_BUILD_DIR=build"
 export "FLUTTER_BUILD_NAME=1.0.0"

@@ -43,14 +43,20 @@ class PdfCheckboxFormField extends PdfFormField {
 /// Helper class for [PdfCheckboxFormField].
 class PdfCheckboxFormFieldHelper extends PdfFormFieldHelper {
   /// Initializes a new instance of the [PdfCheckboxFormFieldHelper] class.
-  PdfCheckboxFormFieldHelper(this.pdfCheckboxField, int pageIndex,
-      {this.onValueChanged})
-      : super(pdfCheckboxField, pageIndex) {
+  PdfCheckboxFormFieldHelper(
+    this.pdfCheckboxField,
+    int pageIndex, {
+    this.pdfCheckBoxItem,
+    this.onValueChanged,
+  }) : super(pdfCheckboxField, pageIndex) {
     bounds = pdfCheckboxField.bounds;
   }
 
   /// The checkbox field object from PDF library.
   final PdfCheckBoxField pdfCheckboxField;
+
+  /// Gets or sets the checked state of the [PdfCheckboxFormField].
+  final PdfCheckBoxItem? pdfCheckBoxItem;
 
   /// The callback which is called when the value of the form field is changed.
   final PdfFormFieldValueChangedCallback? onValueChanged;
@@ -58,16 +64,28 @@ class PdfCheckboxFormFieldHelper extends PdfFormFieldHelper {
   /// The checkbox form field object.
   late PdfCheckboxFormField checkboxFormField;
 
-  /// Adds the grouped items.
-  // ignore: use_setters_to_change_properties
-  void updateChildItems(List<PdfCheckboxFormField> groupedItems) {
+  /// Sets the checkbox form field child items.
+  set checkBoxFormFieldChildItems(List<PdfCheckboxFormField>? groupedItems) {
     checkboxFormField._children = groupedItems;
+  }
+
+  /// Gets the checkbox form field child items.
+  List<PdfCheckboxFormField>? get checkBoxFormFieldChildItems =>
+      checkboxFormField._children;
+
+  /// Updates the child value.
+  void import() {
+    if (pdfCheckBoxItem != null) {
+      checkboxFormField._isChecked = pdfCheckBoxItem!.checked;
+    }
   }
 
   /// Creates the checkbox form field object.
   PdfCheckboxFormField getFormField() {
     checkboxFormField = PdfCheckboxFormField._()
-      .._isChecked = pdfCheckboxField.isChecked;
+      .._isChecked = pdfCheckBoxItem != null
+          ? pdfCheckBoxItem!.checked
+          : pdfCheckboxField.isChecked;
     super.load(checkboxFormField);
 
     return checkboxFormField;
@@ -79,15 +97,13 @@ class PdfCheckboxFormFieldHelper extends PdfFormFieldHelper {
       final bool oldValue = checkboxFormField._isChecked;
       setCheckboxValue(newValue!);
       if (onValueChanged != null) {
-        onValueChanged!(PdfFormFieldValueChangedDetails(
-            checkboxFormField, oldValue, newValue));
-      }
-
-      if (checkboxFormField._children != null &&
-          checkboxFormField._children!.isNotEmpty) {
-        for (final PdfCheckboxFormField item in checkboxFormField._children!) {
-          item.isChecked = newValue;
-        }
+        onValueChanged!(
+          PdfFormFieldValueChangedDetails(
+            checkboxFormField,
+            oldValue,
+            newValue,
+          ),
+        );
       }
       rebuild();
     }
@@ -96,12 +112,38 @@ class PdfCheckboxFormFieldHelper extends PdfFormFieldHelper {
   /// Sets the checkbox value.
   void setCheckboxValue(bool isChecked) {
     checkboxFormField._isChecked = isChecked;
-    pdfCheckboxField.isChecked = isChecked;
+    if (pdfCheckBoxItem != null) {
+      pdfCheckBoxItem!.checked = isChecked;
+      _updateChildItems();
+    } else {
+      pdfCheckboxField.isChecked = isChecked;
+    }
+  }
+
+  /// Updates the grouped field items.
+  void _updateChildItems() {
+    if (checkboxFormField._children != null &&
+        checkboxFormField._children!.isNotEmpty) {
+      for (
+        int index = 0;
+        index < checkboxFormField._children!.length;
+        index++
+      ) {
+        final PdfCheckboxFormFieldHelper helper =
+            PdfFormFieldHelper.getHelper(checkboxFormField._children![index])
+                as PdfCheckboxFormFieldHelper;
+
+        if (helper.pdfCheckBoxItem != null) {
+          checkboxFormField._children![index]._isChecked =
+              helper.pdfCheckBoxItem!.checked;
+          helper.rebuild();
+        }
+      }
+    }
   }
 
   /// Builds the checkbox form field widget.
-  Widget build(BuildContext context, double heightPercentage,
-      {required Function(Offset) onTap}) {
+  Widget build(BuildContext context, double heightPercentage) {
     final double selectionPadding = kIsDesktop ? 0 : kFormFieldSelectionPadding;
     final Rect adjustedBounds = bounds.inflate(selectionPadding);
     return Positioned(
@@ -109,22 +151,34 @@ class PdfCheckboxFormFieldHelper extends PdfFormFieldHelper {
       top: adjustedBounds.top / heightPercentage,
       width: adjustedBounds.width / heightPercentage,
       height: adjustedBounds.height / heightPercentage,
-      child: Listener(
-        onPointerUp: (PointerUpEvent event) {
-          onTap(event.localPosition.translate(
-              adjustedBounds.left / heightPercentage,
-              adjustedBounds.top / heightPercentage));
-        },
-        child: PdfCheckbox(
-          isChecked: checkboxFormField._isChecked,
-          readOnly: checkboxFormField.readOnly,
-          onChanged: invokeValueChanged,
-          heightPercentage: heightPercentage,
-          selectionPadding: selectionPadding,
-          fillColor: const Color.fromARGB(
-              255, 221, 228, 255), // Custom color for the unchecked fill
-          size: bounds.height / heightPercentage,
-        ),
+      child: PdfCheckbox(
+        isChecked: checkboxFormField._isChecked,
+        readOnly: checkboxFormField.readOnly,
+        onChanged: invokeValueChanged,
+        heightPercentage: heightPercentage,
+        selectionPadding: selectionPadding,
+        fillColor: pdfCheckboxField.backColor.isEmpty
+            ? const Color.fromARGB(255, 221, 228, 255)
+            : Color.fromRGBO(
+                pdfCheckboxField.backColor.r,
+                pdfCheckboxField.backColor.g,
+                pdfCheckboxField.backColor.b,
+                1,
+              ),
+        borderColor: pdfCheckboxField.borderColor.isEmpty
+            ? Colors.transparent
+            : Color.fromRGBO(
+                pdfCheckboxField.borderColor.r,
+                pdfCheckboxField.borderColor.g,
+                pdfCheckboxField.borderColor.b,
+                1,
+              ),
+        borderWidth:
+            (pdfCheckboxField.borderWidth == 0
+                ? 1
+                : pdfCheckboxField.borderWidth) /
+            heightPercentage,
+        size: bounds.height / heightPercentage,
       ),
     );
   }
@@ -133,16 +187,18 @@ class PdfCheckboxFormFieldHelper extends PdfFormFieldHelper {
 /// Customized checkbox
 class PdfCheckbox extends StatefulWidget {
   /// Constructor of PdfCheckbox
-  const PdfCheckbox(
-      {Key? key,
-      required this.isChecked,
-      required this.onChanged,
-      this.readOnly = false,
-      required this.heightPercentage,
-      required this.selectionPadding,
-      this.fillColor,
-      this.size = 24.0})
-      : super(key: key);
+  const PdfCheckbox({
+    Key? key,
+    required this.isChecked,
+    required this.onChanged,
+    this.readOnly = false,
+    required this.heightPercentage,
+    required this.selectionPadding,
+    required this.fillColor,
+    required this.borderColor,
+    required this.borderWidth,
+    this.size = 24.0,
+  }) : super(key: key);
 
   /// Checkbox padding
   final double selectionPadding;
@@ -160,10 +216,16 @@ class PdfCheckbox extends StatefulWidget {
   final ValueChanged<bool?>? onChanged;
 
   /// Checkbox fill color
-  final Color? fillColor;
+  final Color fillColor;
 
   /// Checkbox size
   final double size;
+
+  /// Checkbox border color
+  final Color borderColor;
+
+  /// Checkbox border width
+  final double borderWidth;
 
   @override
   _PdfCheckboxState createState() => _PdfCheckboxState();
@@ -187,17 +249,23 @@ class _PdfCheckboxState extends State<PdfCheckbox> {
         });
       },
       child: Padding(
-        padding:
-            EdgeInsets.all(widget.selectionPadding / widget.heightPercentage),
+        padding: EdgeInsets.all(
+          widget.selectionPadding / widget.heightPercentage,
+        ),
         child: Container(
           width: widget.size,
           height: widget.size,
-          decoration:
-              BoxDecoration(color: widget.fillColor ?? Colors.transparent),
+          decoration: BoxDecoration(
+            color: widget.fillColor,
+            border: Border.all(
+              color: widget.borderColor,
+              width: widget.borderWidth,
+            ),
+          ),
           child: widget.isChecked
               ? Icon(
                   Icons.check_outlined,
-                  size: widget.size,
+                  size: widget.size - widget.borderWidth * 2,
                   color: Colors.black,
                 )
               : Container(),

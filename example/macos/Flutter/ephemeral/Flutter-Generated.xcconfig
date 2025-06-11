@@ -1,6 +1,6 @@
 // This is a generated file; do not edit or check into version control.
 FLUTTER_ROOT=/Users/wdt/dev/flutter
-FLUTTER_APPLICATION_PATH=/Users/wdt/Documents/zul/syncfusion_flutter_pdfviewer-23.1.42/example
+FLUTTER_APPLICATION_PATH=/Users/wdt/Documents/zul/custom_pdfviewer_syncfusion/example
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_BUILD_DIR=build
 FLUTTER_BUILD_NAME=1.0.0
